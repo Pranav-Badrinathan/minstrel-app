@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 reqwest = "0.11.17"
-tokio = { version = "1.28.1", features = ["macros", "rt-multi-thread", "signal", "sync"]}
+tokio = { version = "1.28.1", features = ["macros", "rt-multi-thread", "signal", "sync", "fs"]}
+symphonia = { version = "0.5.2", features = ["all-codecs"]}
+opus = "0.3.0"
