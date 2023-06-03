@@ -1,5 +1,5 @@
 // Taken directly from 'kira'.
-// https://github.com/tesselode/kira/blob/58295810a702e11eb68f9ec118cf87c529631ab8/crates/kira/src/dsp/frame.rs
+// https://github.com/tesselode/kira/blob/58295810a702e11eb68f9ec118cf87c529631ab8/crates/kira/src/dsp/frame.rs#L46
 
 use std::{
 	f32::consts::SQRT_2,
@@ -24,14 +24,14 @@ impl Frame {
 	};
 
 	/// Creates a frame with the given left and right values.
-	pub fn new_stereo(left: f32, right: f32) -> Self {
+	pub fn new_streo(left: f32, right: f32) -> Self {
 		Self { left, right }
 	}
 
 	/// Creates a frame with both the left and right channels set
 	/// to the same value.
 	pub fn new_mono(value: f32) -> Self {
-		Self::new(value, value)
+		Self::new_streo(value, value)
 	}
 
 	/// Pans a frame to the left or right.
@@ -46,12 +46,12 @@ impl Frame {
 		if x == 0.5 {
 			return self;
 		}
-		Self::new(self.left * (1.0 - x).sqrt(), self.right * x.sqrt()) * SQRT_2
+		Self::new_streo(self.left * (1.0 - x).sqrt(), self.right * x.sqrt()) * SQRT_2
 	}
 
 	/// Returns the frame mixed down to mono.
 	pub fn as_mono(self) -> Self {
-		Self::from_mono((self.left + self.right) / 2.0)
+		Self::new_mono((self.left + self.right) / 2.0)
 	}
 }
 
@@ -59,7 +59,7 @@ impl Add for Frame {
 	type Output = Self;
 
 	fn add(self, rhs: Self) -> Self::Output {
-		Self::new(self.left + rhs.left, self.right + rhs.right)
+		Self::new_streo(self.left + rhs.left, self.right + rhs.right)
 	}
 }
 
@@ -74,7 +74,7 @@ impl Sub for Frame {
 	type Output = Self;
 
 	fn sub(self, rhs: Self) -> Self::Output {
-		Self::new(self.left - rhs.left, self.right - rhs.right)
+		Self::new_streo(self.left - rhs.left, self.right - rhs.right)
 	}
 }
 
@@ -89,7 +89,7 @@ impl Mul<f32> for Frame {
 	type Output = Self;
 
 	fn mul(self, rhs: f32) -> Self::Output {
-		Self::new(self.left * rhs, self.right * rhs)
+		Self::new_streo(self.left * rhs, self.right * rhs)
 	}
 }
 
@@ -104,7 +104,7 @@ impl Div<f32> for Frame {
 	type Output = Self;
 
 	fn div(self, rhs: f32) -> Self::Output {
-		Self::new(self.left / rhs, self.right / rhs)
+		Self::new_streo(self.left / rhs, self.right / rhs)
 	}
 }
 
@@ -119,6 +119,6 @@ impl Neg for Frame {
 	type Output = Self;
 
 	fn neg(self) -> Self::Output {
-		Self::new(-self.left, -self.right)
+		Self::new_streo(-self.left, -self.right)
 	}
 }
