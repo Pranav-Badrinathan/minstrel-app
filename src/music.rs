@@ -1,8 +1,13 @@
-use std::fs::File;
-
-use symphonia::core::{io::MediaSourceStream, probe::Hint, errors::Error};
-
 use crate::frame::Frame;
+use std::fs::File;
+use symphonia::core::{
+	io::MediaSourceStream, 
+	probe::Hint, 
+	errors::Error, 
+	audio::{ AudioBuffer, AudioBufferRef, Signal }, 
+	sample::Sample, 
+	conv::{	FromSample, IntoSample }
+};
 
 // TODO: Error pls it's horrendus.
 pub async fn decode_music(src: File){
@@ -20,6 +25,9 @@ pub async fn decode_music(src: File){
 				&Default::default()
 	).expect("Decoder not working");
 
+	println!("Sample Rate: {}", decoder.codec_params().sample_rate.unwrap());
+
+
 	let mut frames: Vec<Frame> = vec![];
 
     // The decode loop.
@@ -34,8 +42,8 @@ pub async fn decode_music(src: File){
         };
 
         match decoder.decode(&packet) {
-            Ok(_decoded) => {
-
+            Ok(decoded) => {
+				frames.append(&mut load_frames_from_buffer_ref(&decoded));
             }
             Err(Error::IoError(_)) => {
                 // The packet failed to decode due to an IO error, skip the packet.
@@ -50,5 +58,45 @@ pub async fn decode_music(src: File){
                 panic!("{}", err);
             }
         }
+		
+		let time: f32 = frames.len() as f32 / decoder.codec_params().sample_rate.unwrap() as f32;
+
+		println!("time: {time}, frames: {0}", frames.len());
     }
+}
+
+pub fn load_frames_from_buffer_ref(buffer: &AudioBufferRef) -> Vec<Frame> {
+	match buffer {
+		AudioBufferRef::U8(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::U16(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::U24(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::U32(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::S8(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::S16(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::S24(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::S32(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::F32(buffer) => load_frames_from_buffer(buffer),
+		AudioBufferRef::F64(buffer) => load_frames_from_buffer(buffer),
+	}
+}
+
+// The where means the sample will return an f32 when FromSample<S> on it?
+pub fn load_frames_from_buffer<S: Sample>(buffer: &AudioBuffer<S>) -> Vec<Frame>
+	where f32: FromSample<S>
+{
+	match buffer.spec().channels.count() {
+		1 => buffer
+			.chan(0)
+			.iter()
+			.map(|sample| Frame::new_mono((*sample).into_sample()))
+			.collect(),
+		2 => buffer
+			.chan(0)
+			.iter()
+			.zip(buffer.chan(1).iter())
+			.map(|(left, right)| Frame::new_streo((*left).into_sample(), (*right).into_sample()))
+			.collect(),
+		// TODO: Error handle. Return a Result.
+		_ => panic!("TODO ERROR. Unsupported channel configuration")
+	}
 }
