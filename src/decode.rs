@@ -8,9 +8,10 @@ use symphonia::core::{
 	sample::Sample, 
 	conv::{	FromSample, IntoSample }
 };
+use tokio::sync::mpsc;
 
 // TODO: Error pls it's horrendus.
-pub async fn decode_music(src: File){
+pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
 	let mss = MediaSourceStream::new(Box::new(src), Default::default());
 	let mut format_reader = symphonia::default::get_probe().format(
 																&Hint::new(), 
@@ -61,7 +62,11 @@ pub async fn decode_music(src: File){
 		
 		let time: f32 = frames.len() as f32 / decoder.codec_params().sample_rate.unwrap() as f32;
 
-		println!("time: {time}, frames: {0}", frames.len());
+		if time >= 0.3 {
+			de_send.send(frames).await.expect("Error sending!");
+			frames = Vec::new();
+			println!("thislmao time: {time}, frames: {0}", frames.len());
+		}
     }
 }
 
