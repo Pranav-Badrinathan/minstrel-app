@@ -1,4 +1,3 @@
-use crate::frame::Frame;
 use std::fs::File;
 use symphonia::core::{
 	io::MediaSourceStream, 
@@ -11,7 +10,7 @@ use symphonia::core::{
 use tokio::sync::mpsc;
 
 // TODO: Error pls it's horrendus.
-pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
+pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<f32>>){
 	let mss = MediaSourceStream::new(Box::new(src), Default::default());
 	let mut format_reader = symphonia::default::get_probe().format(
 																&Hint::new(), 
@@ -29,7 +28,7 @@ pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
 	println!("Sample Rate: {}", decoder.codec_params().sample_rate.unwrap());
 
 
-	let mut frames: Vec<Frame> = vec![];
+	let mut frames: Vec<f32> = vec![];
 
     // The decode loop.
     loop {
@@ -65,12 +64,11 @@ pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
 		if time >= 0.3 {
 			de_send.send(frames).await.expect("Error sending!");
 			frames = Vec::new();
-			println!("thislmao time: {time}, frames: {0}", frames.len());
 		}
     }
 }
 
-pub fn load_frames_from_buffer_ref(buffer: &AudioBufferRef) -> Vec<Frame> {
+pub fn load_frames_from_buffer_ref(buffer: &AudioBufferRef) -> Vec<f32> {
 	match buffer {
 		AudioBufferRef::U8(buffer) => load_frames_from_buffer(buffer),
 		AudioBufferRef::U16(buffer) => load_frames_from_buffer(buffer),
@@ -86,22 +84,30 @@ pub fn load_frames_from_buffer_ref(buffer: &AudioBufferRef) -> Vec<Frame> {
 }
 
 // The where means the sample will return an f32 when FromSample<S> on it?
-pub fn load_frames_from_buffer<S: Sample>(buffer: &AudioBuffer<S>) -> Vec<Frame>
+pub fn load_frames_from_buffer<S: Sample>(buffer: &AudioBuffer<S>) -> Vec<f32>
 	where f32: FromSample<S>
 {
 	match buffer.spec().channels.count() {
 		1 => buffer
 			.chan(0)
-			.iter()
-			.map(|sample| Frame::new_mono((*sample).into_sample()))
+			.into_iter()
+			.map(|a| (*a).into_sample())
 			.collect(),
-		2 => buffer
-			.chan(0)
-			.iter()
-			.zip(buffer.chan(1).iter())
-			.map(|(left, right)| Frame::new_streo((*left).into_sample(), (*right).into_sample()))
-			.collect(),
+
+		2 => interleave(
+			buffer.chan(0).into_iter().map(|a| (*a).into_sample()).collect(), 
+			buffer.chan(1).into_iter().map(|a| (*a).into_sample()).collect()
+		),
 		// TODO: Error handle. Return a Result.
 		_ => panic!("TODO ERROR. Unsupported channel configuration")
 	}
+}
+
+pub fn interleave<T>(a: T, b: T) -> T
+	where T: IntoIterator + FromIterator<T::Item>
+{
+	a.into_iter()
+        .zip(b.into_iter()) 
+        .flat_map(|(a, b)| [a, b].into_iter())
+        .collect::<T>()
 }
