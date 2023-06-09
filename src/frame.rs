@@ -55,6 +55,20 @@ impl Frame {
 	}
 }
 
+pub fn lefts(frames: &[Frame]) -> Vec<f32> {
+	frames
+	.into_iter()
+	.map(|f| f.left)
+	.collect()
+}
+
+pub fn rights(frames: &[Frame]) -> Vec<f32> {
+	frames
+	.into_iter()
+	.map(|f| f.right)
+	.collect()
+}
+
 impl Add for Frame {
 	type Output = Self;
 
