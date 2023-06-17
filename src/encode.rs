@@ -6,6 +6,15 @@ use crate::frame::{Frame, lefts, rights};
 pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	println!("encodin!");
 
+	let guild_id = match std::env::args().nth(1) {
+		Some(id) => u64::from_str_radix(&id, 10)
+			.expect("Please provide an integer for the server ID"),
+		None => {
+			eprintln!("Please provide a guild_id!");
+			return
+		}
+	};
+
 	loop {
 		let frames = en_recv.recv().await.unwrap_or_default();
 
@@ -16,12 +25,12 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 		for chunk in chunkenize(frames, 2880) {
 			//the frames sent in must be of size 120, 240, 480, 960, 1920, or 2880
 			let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
-
+			
 			let client = reqwest::Client::new();		
-			let _res = client.post("http://127.0.0.1:4242")
+			let _res = client.post("http://127.0.0.1:4242/")
+				.header("guild_id", guild_id)
 				.body(encoded).send().await.expect("Something went wrong here...");
 		}
-
 	}
 }
 
