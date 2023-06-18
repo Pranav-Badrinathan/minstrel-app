@@ -1,7 +1,7 @@
 use opus::{Encoder, Channels, Application};
 use tokio::sync::mpsc;
 
-use crate::frame::{Frame, lefts, rights};
+use crate::frame::{ Frame, self };
 
 pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	println!("encodin!");
@@ -15,16 +15,21 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 		}
 	};
 
+	let mut frame_buf: Vec<Frame> = Vec::new();
+
 	loop {
-		let frames = en_recv.recv().await.unwrap_or_default();
+		frame_buf.append(&mut en_recv.recv().await.unwrap_or_default());
 
 		let mut encoder = Encoder::new(48000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
-		println!("Frames Len: {}", frames.len());
+		println!("Frames Len: {}", frame_buf.len());
 
-		for chunk in chunkenize(frames, 2880) {
-			//the frames sent in must be of size 120, 240, 480, 960, 1920, or 2880
-			let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+		let (x, chunks) = chunkenize(frame_buf, 960);
+		frame_buf = x;
+
+		for chunk in chunks {
+			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
+			let encoded = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
 			
 			let client = reqwest::Client::new();		
 			let _res = client.post("http://127.0.0.1:4242/")
@@ -37,20 +42,18 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 
 // TODO: Better, more descriptive name lol.
 
-pub fn chunkenize(audio_data: Vec<Frame>, chunk_size: usize) -> impl Iterator<Item = Vec<f32>> {
+pub fn chunkenize(audio_data: Vec<Frame>, chunk_size: usize) -> (Vec<Frame>, impl Iterator<Item = Vec<f32>>) {
 	let mut data: Vec<Vec<f32>> = Vec::new();
 	
-	for chunk in audio_data.chunks(chunk_size) {
-		let mut f32_chunk = interleave(lefts(chunk), rights(chunk));
+	let chunk_iter = audio_data.chunks_exact(chunk_size);
+	let remainder = chunk_iter.remainder();
 
-		if f32_chunk.len() < (2 * chunk_size) {
-			f32_chunk.resize(2 * chunk_size, 0.0);
-		}
-
+	for chunk in chunk_iter {
+		let f32_chunk = interleave(frame::lefts(chunk), frame::rights(chunk));
 		data.push(f32_chunk);
 	}
 
-	data.into_iter()
+	(remainder.to_vec(), data.into_iter())
 }
 
 pub fn interleave<T>(a: T, b: T) -> T
