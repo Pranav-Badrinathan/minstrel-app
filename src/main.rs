@@ -15,7 +15,7 @@ async fn main() {
 
 	let decode_task = tokio::spawn(
 		decode::decode_music(
-			File::open("audio_samples/skyrim from past to present.mp3")
+			File::open("audio_samples/skyrim from past to present 48khz.mp3")
 				.expect("File open error"), de_send
 	));
 
