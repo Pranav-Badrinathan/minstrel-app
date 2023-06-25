@@ -38,7 +38,7 @@ pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
 		let packet = match format_reader.next_packet() {
             Ok(packet) => packet,
             Err(err) => {
-				// Unrecoverable error. TODO: Add non-panic handling.
+				// Unrecoverable error. TODO: Add non-panic handling. Could be end of stream
                 panic!("{}", err);
             }
         };

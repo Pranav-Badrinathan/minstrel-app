@@ -16,25 +16,27 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	};
 
 	let mut frame_buf: Vec<Frame> = Vec::new();
+	let mut encoder = Encoder::new(48000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
 	loop {
 		frame_buf.append(&mut en_recv.recv().await.unwrap_or_default());
 
-		let mut encoder = Encoder::new(48000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
 		println!("Frames Len: {}", frame_buf.len());
 
-		let (x, chunks) = chunkenize(frame_buf, 960);
+		let (x, chunks) = chunkenize(frame_buf, 2880);
 		frame_buf = x;
 
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			let encoded = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
+			let mut encoded: Vec<u8> = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+			let mut buf = (encoded.len() as i16).to_le_bytes().to_vec();
+			buf.append(&mut encoded);
 			
 			let client = reqwest::Client::new();		
 			let _res = client.post("http://127.0.0.1:4242/")
 				.header("guild_id", guild_id)
-				.body(encoded).send().await.expect("Something went wrong here...");
+				.body(buf).send().await.expect("Something went wrong here...");
 		}
 	}
 }
