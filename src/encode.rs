@@ -29,14 +29,12 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			let mut encoded: Vec<u8> = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
-			let mut buf = (encoded.len() as i16).to_le_bytes().to_vec();
-			buf.append(&mut encoded);
+			let encoded: Vec<u8> = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
 			
 			let client = reqwest::Client::new();		
 			let _res = client.post("http://127.0.0.1:4242/")
 				.header("guild_id", guild_id)
-				.body(buf).send().await.expect("Something went wrong here...");
+				.body(encoded).send().await.expect("Something went wrong here...");
 		}
 	}
 }
