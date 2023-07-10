@@ -21,21 +21,29 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	loop {
 		frame_buf.append(&mut en_recv.recv().await.unwrap_or_default());
 
-
-		println!("Frames Len: {}", frame_buf.len());
-
 		let (x, chunks) = chunkenize(frame_buf, 2880);
 		frame_buf = x;
 
+		let c_size = chunks.size_hint().1.unwrap_or(chunks.size_hint().0);
+
+		let mut encoded: Vec<u8> = Vec::new();
+
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			let encoded: Vec<u8> = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
-			
-			let client = reqwest::Client::new();		
-			let _res = client.post("http://127.0.0.1:4242/")
-				.header("guild_id", guild_id)
-				.body(encoded).send().await.expect("Something went wrong here...");
+			let enc_chunk = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+			encoded.append(
+				&mut [(enc_chunk.len() as i16).to_le_bytes().to_vec(), enc_chunk].concat()
+			);
+
+			// let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+			println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
 		}
+
+		let client = reqwest::Client::new();		
+		let _res = client.post("http://127.0.0.1:4242/")
+			.header("guild_id", guild_id)
+			.header("frame_count", c_size)
+			.body(encoded).send().await.expect("Something went wrong here...");
 	}
 }
 
@@ -70,26 +78,27 @@ pub fn resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 	use rubato::{
 		Resampler, 
 		SincFixedIn, 
-		InterpolationType, 
-		InterpolationParameters, 
+		SincInterpolationType, 
+		SincInterpolationParameters, 
 		WindowFunction};
 
-	let i_params = InterpolationParameters {
+	let i_params = SincInterpolationParameters {
 		sinc_len: 240,
 		f_cutoff: 0.95,
 		oversampling_factor: 160,
-		interpolation: InterpolationType::Nearest,
+		interpolation: SincInterpolationType::Nearest,
 		window: WindowFunction::BlackmanHarris2
 	};
 	
 	let mut resampler = SincFixedIn::<f32>::new(
 		48000 as f64 / 44100 as f64,
+		2.0,
 		i_params,
 		input.get(0).unwrap().len(),
 		2
-	);
+	).unwrap();
 
-	let result = match resampler.process(&input) {
+	let result = match resampler.process(&input, None) {
 		Ok(r) => r,
 		Err(e) => {
 			eprintln!("Resampling error: {}", e);
