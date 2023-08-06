@@ -1,5 +1,5 @@
 use opus::{Encoder, Channels, Application};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, net::TcpStream, io::AsyncWriteExt};
 
 use crate::frame::{ Frame, self };
 
@@ -18,6 +18,9 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	let mut frame_buf: Vec<Frame> = Vec::new();
 	let mut encoder = Encoder::new(48000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
+	//TODO: Erorr Handle this...
+	let mut stream = TcpStream::connect("127.0.0.1:4242".to_string()).await.expect("Error connecting!");
+
 	loop {
 		frame_buf.append(&mut en_recv.recv().await.unwrap_or_default());
 
@@ -31,22 +34,16 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
 			let enc_chunk = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
-			encoded.append(
-				&mut [(enc_chunk.len() as i16).to_le_bytes().to_vec(), enc_chunk].concat()
-			);
+			encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
+			encoded.extend(enc_chunk);
 
 			// let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
 			println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
 		}
 
-		let client = reqwest::Client::new();		
-		let _res = client.post("http://127.0.0.1:4242/")
-			.header("guild_id", guild_id)
-			.header("frame_count", c_size)
-			.body(encoded).send().await.expect("Something went wrong here...");
+		let _ = stream.write(&encoded).await;
 	}
 }
-
 
 // TODO: Better, more descriptive name lol.
 pub fn chunkenize(audio_data: Vec<Frame>, chunk_size: usize) -> (Vec<Frame>, impl Iterator<Item = Vec<f32>>) {
@@ -74,7 +71,7 @@ pub fn interleave<T>(a: T, b: T) -> T
         .collect::<T>()
 }
 
-pub fn resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
+pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 	use rubato::{
 		Resampler, 
 		SincFixedIn, 
