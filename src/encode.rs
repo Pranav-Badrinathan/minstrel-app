@@ -1,12 +1,12 @@
 use opus::{Encoder, Channels, Application};
-use tokio::{sync::mpsc, net::TcpStream, io::AsyncWriteExt};
+use tokio::{sync::mpsc, net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
 
 use crate::frame::{ Frame, self };
 
 pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	println!("encodin!");
 
-	let guild_id = match std::env::args().nth(1) {
+	let guild_id: u64 = match std::env::args().nth(1) {
 		Some(id) => u64::from_str_radix(&id, 10)
 			.expect("Please provide an integer for the server ID"),
 		None => {
@@ -16,10 +16,14 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	};
 
 	let mut frame_buf: Vec<Frame> = Vec::new();
-	let mut encoder = Encoder::new(48000, Channels::Stereo, Application::Audio).expect("Err encoder");
+	let mut encoder = Encoder::new(48_000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
 	//TODO: Erorr Handle this...
 	let mut stream = TcpStream::connect("127.0.0.1:4242".to_string()).await.expect("Error connecting!");
+
+	//Send the guild_id.
+	stream.write(&guild_id.to_be_bytes()).await.expect("GuildID Write Error");
+	stream.flush().await.expect("GuildID Flush Error");
 
 	loop {
 		frame_buf.append(&mut en_recv.recv().await.unwrap_or_default());
@@ -27,21 +31,29 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 		let (x, chunks) = chunkenize(frame_buf, 2880);
 		frame_buf = x;
 
-		let c_size = chunks.size_hint().1.unwrap_or(chunks.size_hint().0);
-
-		let mut encoded: Vec<u8> = Vec::new();
+		// let mut encoded: Vec<u8> = Vec::new();
 
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			let enc_chunk = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
-			encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
-			encoded.extend(enc_chunk);
+			// let enc_chunk = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+			// encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
+			// encoded.extend(enc_chunk);
 
-			// let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
+			let encoded = encoder.encode_vec_float(&chunk, 5760 as usize).expect("HIH");
 			println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
-		}
+			let _ = stream.write(&encoded).await;
+			let _ = stream.flush().await;
 
-		let _ = stream.write(&encoded).await;
+			loop {
+				match stream.read_u8().await {
+					Ok(0) => break,
+					Ok(1) => break,
+					Ok(c) => eprintln!("Unknown acknowledgement code: {}", c),
+					Err(ref e) if e.kind() == tokio::io::ErrorKind::WouldBlock => continue,
+					Err(_) => panic!("Acknowledgement read error! Remove this panic later"),
+				}
+			}
+		}
 	}
 }
 
