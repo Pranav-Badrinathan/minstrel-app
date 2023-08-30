@@ -1,16 +1,22 @@
+#![allow(non_snake_case)]
+
 use std::fs::File;
-	
+use dioxus::prelude::*;
+
 mod frame;
 mod decode;
 mod encode;
+
+// For Dioxus Components
 
 #[tokio::main]
 async fn main() {
     println!("Howdy.");
 
-	// "Symphonia" crate is not async. Because it is blocking, we need to simulate async
-	// by setting channel limit to 1. After 1 iteration, symphonia's green thread yields 
-	// for other threads to async-ly do their bit. Not the solution, but works for now.
+	dioxus_desktop::launch(App);
+}
+
+async fn play() {
 	let (de_send, en_recv) = tokio::sync::mpsc::channel(1);
 
 	let decode_task = tokio::spawn(
@@ -23,7 +29,14 @@ async fn main() {
 		encode::encode_music(en_recv)
 	);
 
-	// tokio::try_join!(decode_task, encode_task).expect("Decode/Encode & Send concurrency failed");
-	
 	let (_a, _b) = (decode_task.await, encode_task.await);
+}
+
+fn App(cx: Scope) -> Element {
+	cx.render(rsx! {
+		button {
+			onclick: move |_| play(),
+			"Play"
+		}
+	})
 }
