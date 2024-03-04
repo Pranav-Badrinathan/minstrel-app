@@ -21,7 +21,7 @@ async fn play() {
 
 	let decode_task = tokio::spawn(
 		decode::decode_music(
-			File::open("audio_samples/skyrim from past to present 48khz.mp3")
+			File::open("audio_samples/skyrim_watch_the_skies.mp3")
 				.expect("File open error"), de_send
 	));
 
@@ -34,9 +34,14 @@ async fn play() {
 
 fn App(cx: Scope) -> Element {
 	cx.render(rsx! {
-		button {
-			onclick: move |_| play(),
-			"Play"
+		style { include_str!("../src/style.css") },
+		div {
+			id: "banner",
+			// Initiate connection button.
+			button {
+				onclick: move |_| play(),
+				"Play"
+			}
 		}
 	})
 }
