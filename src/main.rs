@@ -21,7 +21,7 @@ async fn play() {
 
 	let decode_task = tokio::spawn(
 		decode::decode_music(
-			File::open("audio_samples/skyrim_watch_the_skies.mp3")
+			File::open("audio_samples/skyrim_one_they_fear.mp3")
 				.expect("File open error"), de_send
 	));
 

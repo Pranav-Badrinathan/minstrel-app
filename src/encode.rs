@@ -31,27 +31,28 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 		let (x, chunks) = chunkenize(frame_buf, 960);
 		frame_buf = x;
 
-		// let mut encoded: Vec<u8> = Vec::new();
+		let mut encoded: Vec<u8> = Vec::new();
 
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			// let enc_chunk = encoder.encode_vec_float(&chunk, 960 as usize).expect("HIH");
-			// encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
-			// encoded.extend(enc_chunk);
+			let enc_chunk = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
+			encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
+			encoded.extend(enc_chunk);
 
-			let encoded = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
-            let _ = stream.write(&encoded).await;
-            let _ = stream.flush().await;
-            println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
+			// let mut encoded = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
+		}
 
-			loop {
-				match stream.read_u8().await {
-					Ok(0) => break,
-					Ok(1) => break,
-					Ok(c) => eprintln!("Unknown acknowledgement code: {}", c),
-					Err(ref e) if e.kind() == tokio::io::ErrorKind::WouldBlock => continue,
-					Err(_) => panic!("Acknowledgement read error! Remove this panic later."),
-				}
+		let _ = stream.write(&encoded).await;
+		let _ = stream.flush().await;
+		println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
+
+		loop {
+			match stream.read_u8().await {
+				Ok(0) => break,
+				Ok(1) => break,
+				Ok(c) => eprintln!("Unknown acknowledgement code: {}", c),
+				Err(ref e) if e.kind() == tokio::io::ErrorKind::WouldBlock => continue,
+				Err(_) => panic!("Acknowledgement read error! Remove this panic later."),
 			}
 		}
 	}
