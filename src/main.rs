@@ -1,19 +1,49 @@
-#![allow(non_snake_case)]
-
 use std::fs::File;
-use dioxus::prelude::*;
+
+use iced::{executor, widget::button, Application, Command, Settings, Theme};
 
 mod frame;
 mod decode;
 mod encode;
 
-// For Dioxus Components
+// Struct for holding the app state.
+struct Minstrel;
 
-#[tokio::main]
-async fn main() {
+#[derive(Clone, Copy, Debug)]
+enum Message {
+	Connect,
+	Connected
+}
+
+impl Application for Minstrel {
+    type Executor = executor::Default;
+    type Message = Message;
+    type Theme = Theme;
+    type Flags = ();
+
+    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        (Self, Command::none())
+    }
+
+    fn title(&self) -> String {
+        String::from("Minstrel")
+    }
+
+	fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+		match message {
+			Message::Connect => Command::perform(play(), |_| Message::Connected),
+			Message::Connected => Command::none(),
+		}
+    }
+
+    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
+		button("Connect!").on_press(Message::Connect).into()
+    }
+}
+
+fn main() -> iced::Result {
     println!("Howdy.");
-
-	dioxus_desktop::launch(App);
+	Minstrel::run(Settings::default())
 }
 
 async fn play() {
@@ -32,16 +62,3 @@ async fn play() {
 	let (_a, _b) = (decode_task.await, encode_task.await);
 }
 
-fn App(cx: Scope) -> Element {
-	cx.render(rsx! {
-		style { include_str!("../src/style.css") },
-		div {
-			id: "banner",
-			// Initiate connection button.
-			button {
-				onclick: move |_| play(),
-				"Play"
-			}
-		}
-	})
-}

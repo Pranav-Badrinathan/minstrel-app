@@ -11,5 +11,4 @@ tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread", "signal",
 symphonia = { version = "0.5.3", features = ["all-codecs"]}
 opus = "0.3.0"
 rubato = "0.14.1"
-dioxus = "0.4.0"
-dioxus-desktop = "0.4.0"
+iced = { version = "0.12.1", features = ["tokio"] }
