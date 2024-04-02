@@ -7,7 +7,7 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	println!("encodin!");
 
 	let guild_id: u64 = match std::env::args().nth(1) {
-		Some(id) => u64::from_str_radix(&id, 10)
+		Some(id) => id.parse::<u64>()
 			.expect("Please provide an integer for the server ID"),
 		None => {
 			eprintln!("Please provide a guild_id!");
@@ -22,7 +22,7 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 	let mut stream = TcpStream::connect("127.0.0.1:4242".to_string()).await.expect("Error connecting!");
 
 	//Send the guild_id.
-	stream.write(&guild_id.to_be_bytes()).await.expect("GuildID Write Error");
+	stream.write_all(&guild_id.to_be_bytes()).await.expect("GuildID Write Error");
 	stream.flush().await.expect("GuildID Flush Error");
 
 	loop {
@@ -35,11 +35,11 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 
 		for chunk in chunks {
 			//the chunks sent in must be of size 120, 240, 480, 960, 1920, or 2880 per channel.
-			let enc_chunk = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
+			let enc_chunk = encoder.encode_vec_float(&chunk, 1920_usize).expect("HIH");
 			encoded.extend((enc_chunk.len() as i16).to_le_bytes().to_vec());
 			encoded.extend(enc_chunk);
 
-			// let mut encoded = encoder.encode_vec_float(&chunk, 1920 as usize).expect("HIH");
+			// let mut encoded = encoder.encode_vec_float(&chunk, 1920_usize).expect("HIH");
 		}
 
 		let _ = stream.write(&encoded).await;
@@ -79,17 +79,17 @@ pub fn interleave<T>(a: T, b: T) -> T
 	where T: IntoIterator + FromIterator<T::Item>
 {
 	a.into_iter()
-        .zip(b.into_iter()) 
+        .zip(b)
         .flat_map(|(a, b)| [a, b].into_iter())
         .collect::<T>()
 }
 
 pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 	use rubato::{
-		Resampler, 
-		SincFixedIn, 
-		SincInterpolationType, 
-		SincInterpolationParameters, 
+		Resampler,
+		SincFixedIn,
+		SincInterpolationType,
+		SincInterpolationParameters,
 		WindowFunction};
 
 	let i_params = SincInterpolationParameters {
@@ -101,10 +101,10 @@ pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 	};
 	
 	let mut resampler = SincFixedIn::<f32>::new(
-		48000 as f64 / 44100 as f64,
+		48000_f64 / 44100_f64,
 		2.0,
 		i_params,
-		input.get(0).unwrap().len(),
+		input.first().unwrap().len(),
 		2
 	).unwrap();
 
@@ -116,6 +116,7 @@ pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 		}
 	};
 
+	#[allow(clippy::get_first)]
 	// TODO: Handle the unwrap.
 	(result.get(0).unwrap().to_vec(), result.get(1).unwrap().to_vec())
 }

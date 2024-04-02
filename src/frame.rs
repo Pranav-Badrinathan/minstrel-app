@@ -15,6 +15,7 @@ pub struct Frame {
 	pub right: f32,
 }
 
+#[allow(dead_code)]
 impl Frame {
 	/// A [`Frame`] with both the left and right samples
 	/// set to `0.0`.
@@ -57,14 +58,14 @@ impl Frame {
 
 pub fn lefts(frames: &[Frame]) -> Vec<f32> {
 	frames
-	.into_iter()
+	.iter()
 	.map(|f| f.left)
 	.collect()
 }
 
 pub fn rights(frames: &[Frame]) -> Vec<f32> {
 	frames
-	.into_iter()
+	.iter()
 	.map(|f| f.right)
 	.collect()
 }

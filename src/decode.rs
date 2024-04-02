@@ -1,10 +1,10 @@
 use std::fs::File;
 use symphonia::core::{
-	io::MediaSourceStream, 
-	probe::Hint, 
-	errors::Error, 
-	audio::{ AudioBuffer, AudioBufferRef, Signal }, 
-	sample::Sample, 
+	io::MediaSourceStream,
+	probe::Hint,
+	errors::Error,
+	audio::{ AudioBuffer, AudioBufferRef, Signal },
+	sample::Sample,
 	conv::{	FromSample, IntoSample }
 };
 use tokio::sync::mpsc;
@@ -14,16 +14,17 @@ use crate::frame::Frame;
 // TODO: Error pls it's horrendus.
 pub async fn decode_music(src: File, de_send: mpsc::Sender<Vec<Frame>>){
 	let mss = MediaSourceStream::new(Box::new(src), Default::default());
-	let mut format_reader = symphonia::default::get_probe().format(
-																&Hint::new(), 
-																mss, 
-																&Default::default(), 
-																&Default::default()
-	).expect("Unsupported Format!").format;
+	let mut format_reader = symphonia::default::get_probe()
+		.format(
+			&Hint::new(),
+			mss,
+			&Default::default(),
+			&Default::default()
+		).expect("Unsupported Format!").format;
 
 	// TODO: Remove the unwrap and implement error handling.
 	let mut decoder = symphonia::default::get_codecs().make(
-				&format_reader.default_track().unwrap().codec_params, 
+				&format_reader.default_track().unwrap().codec_params,
 				&Default::default()
 	).expect("Decoder not working");
 
@@ -92,14 +93,14 @@ pub fn load_frames_from_buffer<S: Sample>(buffer: &AudioBuffer<S>) -> Vec<Frame>
 	match buffer.spec().channels.count() {
 		1 => buffer
 			.chan(0)
-			.into_iter()
+			.iter()
 			.map(|s| Frame::new_mono((*s).into_sample()))
 			.collect(),
 
 		2 => buffer
 			.chan(0)
-			.into_iter()
-			.zip(buffer.chan(1).into_iter())
+			.iter()
+			.zip(buffer.chan(1))
 			.map(|(left, right)| Frame::new_streo((*left).into_sample(), (*right).into_sample()))
 			.collect(),
 		// TODO: Error handle. Return a Result.
