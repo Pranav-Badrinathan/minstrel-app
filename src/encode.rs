@@ -1,9 +1,13 @@
-use opus::{Encoder, Channels, Application};
-use tokio::{sync::mpsc, net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
+use opus::{Application, Channels, Encoder};
+use tokio::{
+	io::{AsyncReadExt, AsyncWriteExt},
+	net::TcpStream,
+	sync::mpsc,
+};
 
-use crate::frame::{ Frame, self };
+use crate::frame::{self, Frame};
 
-pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
+pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>) {
 	println!("encodin!");
 
 	let guild_id: u64 = match std::env::args().nth(1) {
@@ -11,18 +15,21 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 			.expect("Please provide an integer for the server ID"),
 		None => {
 			eprintln!("Please provide a guild_id!");
-			return
+			return;
 		}
 	};
 
 	let mut frame_buf: Vec<Frame> = Vec::new();
-	let mut encoder = Encoder::new(48_000, Channels::Stereo, Application::Audio).expect("Err encoder");
+	let mut encoder =
+		Encoder::new(48_000, Channels::Stereo, Application::Audio).expect("Err encoder");
 
 	//TODO: Erorr Handle this...
-	let mut stream = TcpStream::connect("127.0.0.1:4242".to_string()).await.expect("Error connecting!");
+	let mut stream = TcpStream::connect("127.0.0.1:4242".to_string()).await
+		.expect("Error connecting!");
 
 	//Send the guild_id.
-	stream.write_all(&guild_id.to_be_bytes()).await.expect("GuildID Write Error");
+	stream.write_all(&guild_id.to_be_bytes()).await
+		.expect("GuildID Write Error");
 	stream.flush().await.expect("GuildID Flush Error");
 
 	loop {
@@ -44,7 +51,11 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 
 		let _ = stream.write(&encoded).await;
 		let _ = stream.flush().await;
-		println!("Encoded Len: {}, Frame remainder Len: {}", encoded.len(), frame_buf.len());
+		println!(
+			"Encoded Len: {}, Frame remainder Len: {}",
+			encoded.len(),
+			frame_buf.len()
+		);
 
 		loop {
 			match stream.read_u8().await {
@@ -59,9 +70,12 @@ pub async fn encode_music(mut en_recv: mpsc::Receiver<Vec<Frame>>){
 }
 
 // TODO: Better, more descriptive name lol.
-pub fn chunkenize(audio_data: Vec<Frame>, chunk_size: usize) -> (Vec<Frame>, impl Iterator<Item = Vec<f32>>) {
+pub fn chunkenize(
+	audio_data: Vec<Frame>,
+	chunk_size: usize,
+) -> (Vec<Frame>, impl Iterator<Item = Vec<f32>>) {
 	let mut data: Vec<Vec<f32>> = Vec::new();
-	
+
 	let chunk_iter = audio_data.chunks_exact(chunk_size);
 	let remainder = chunk_iter.remainder();
 
@@ -79,34 +93,36 @@ pub fn interleave<T>(a: T, b: T) -> T
 	where T: IntoIterator + FromIterator<T::Item>
 {
 	a.into_iter()
-        .zip(b)
-        .flat_map(|(a, b)| [a, b].into_iter())
-        .collect::<T>()
+		.zip(b)
+		.flat_map(|(a, b)| [a, b].into_iter())
+		.collect::<T>()
 }
 
 pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 	use rubato::{
 		Resampler,
 		SincFixedIn,
-		SincInterpolationType,
 		SincInterpolationParameters,
-		WindowFunction};
+		SincInterpolationType,
+		WindowFunction,
+	};
 
 	let i_params = SincInterpolationParameters {
 		sinc_len: 240,
 		f_cutoff: 0.95,
 		oversampling_factor: 160,
 		interpolation: SincInterpolationType::Nearest,
-		window: WindowFunction::BlackmanHarris2
+		window: WindowFunction::BlackmanHarris2,
 	};
-	
+
 	let mut resampler = SincFixedIn::<f32>::new(
 		48000_f64 / 44100_f64,
 		2.0,
 		i_params,
 		input.first().unwrap().len(),
-		2
-	).unwrap();
+		2,
+	)
+	.unwrap();
 
 	let result = match resampler.process(&input, None) {
 		Ok(r) => r,
@@ -118,5 +134,8 @@ pub fn _resample(input: Vec<Vec<f32>>) -> (Vec<f32>, Vec<f32>) {
 
 	#[allow(clippy::get_first)]
 	// TODO: Handle the unwrap.
-	(result.get(0).unwrap().to_vec(), result.get(1).unwrap().to_vec())
+	(
+		result.get(0).unwrap().to_vec(),
+		result.get(1).unwrap().to_vec(),
+	)
 }
