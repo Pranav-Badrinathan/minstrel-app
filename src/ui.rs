@@ -1,3 +1,5 @@
+use std::{fmt::Display, num::NonZeroU64};
+
 use iced::{
 	executor,
 	widget::{
@@ -9,15 +11,15 @@ use iced::{
 // Struct for holding the app state.
 #[derive(Default)]
 pub(crate) struct Minstrel {
-	target_guild: Option<u64>,
-	saved_guilds: Vec<u64>,
+	target_guild: Option<GuildConnection>,
+	saved_guilds: Vec<GuildConnection>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum Message {
 	Connect,
 	Connected,
-	SelectGuild(u64),
+	SelectGuild(GuildConnection),
 }
 
 impl Application for Minstrel {
@@ -29,7 +31,7 @@ impl Application for Minstrel {
 	fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
 		(
 			Self {
-				saved_guilds: vec![0, 1, 2, 3, 4, 5],
+				saved_guilds: vec![GuildConnection::new("name", 100u64)],
 				..Default::default()
 			},
 			Command::none(),
@@ -56,7 +58,7 @@ impl Application for Minstrel {
 		let con_btn = button("Connect!").on_press(Message::Connect);
 		let guild_lst = pick_list(
 			self.saved_guilds.as_slice(),
-			self.target_guild,
+			self.target_guild.clone(),
 			Message::SelectGuild,
 		);
 
@@ -72,4 +74,25 @@ impl Application for Minstrel {
 
 		container(page).into()
 	}
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct GuildConnection {
+	pub name: String,
+	pub guild_id: NonZeroU64,
+}
+
+impl GuildConnection {
+	pub fn new(name: &str, guild_id: u64) -> Self {
+		GuildConnection {
+			name: name.to_string(),
+			guild_id: NonZeroU64::new(guild_id).unwrap(),
+		}
+	}
+}
+
+impl Display for GuildConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.pad(&self.name)
+    }
 }
